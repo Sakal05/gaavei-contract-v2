@@ -122,6 +122,30 @@ contract GaaveiDrop is ERC1155LazyMint {
      *  @notice          Lets an address claim multiple lazy minted NFTs at once to a recipient.
      *                   This function prevents any reentrant calls, and is not allowed to be overridden.
      *
+     *                   Contract creators should override `verifyClaim` and `transferTokensOnClaim`
+     *                   functions to create custom logic for verification and claiming,
+     *                   for e.g. price collection, allowlist, max quantity, etc.
+     *
+     *  @dev             The logic in `verifyClaim` determines whether the caller is authorized to mint NFTs.
+     *                   The logic in `transferTokensOnClaim` does actual minting of tokens,
+     *                   can also be used to apply other state changes.
+     *
+     *  @param _receiver  The recipient of the tokens to mint.
+     *  @param _tokenId   The tokenId of the lazy minted NFT to mint.
+     *  @param _quantity  The number of tokens to mint.
+     */
+    function claim(address _receiver, uint256 _tokenId, uint256 _quantity) public payable override nonReentrant {
+        require(_tokenId < nextTokenIdToMint(), "invalid id");
+        verifyClaim(msg.sender, _tokenId, _quantity); // Add your claim verification logic by overriding this function.
+
+        _transferTokensOnClaim(_receiver, _tokenId, _quantity); // Mints tokens. Apply any state updates by overriding this function.
+        emit TokensClaimed(msg.sender, _receiver, _tokenId, _quantity);
+    }
+
+    /**
+     *  @notice          Lets an address claim multiple lazy minted NFTs at once to a recipient.
+     *                   This function prevents any reentrant calls, and is not allowed to be overridden.
+     *
      *                   Contract creators should override `verifyClaim` and `batchTransferTokensOnClaim`
      *                   functions to create custom logic for verification and claiming,
      *                   for e.g. price collection, allowlist, max quantity, etc.
@@ -221,7 +245,7 @@ contract GaaveiDrop is ERC1155LazyMint {
             targetRestrictionId = keccak256(abi.encodePacked(msg.sender, block.number, _tokenId));
         }
 
-        if (supplyClaimed <= _restriction.maxSupply) {
+        if (supplyClaimed > _restriction.maxSupply) {
             revert("MaxSupplyClaimed");
         }
 
